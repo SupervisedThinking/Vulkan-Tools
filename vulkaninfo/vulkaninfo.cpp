@@ -869,6 +869,24 @@ int main(int argc, char **argv) {
     bool show_formats = false;
     char *output_path = nullptr;
 
+    // Figure out the name of the executable, pull out the name if given a path
+    // Default is `vulkaninfo`
+    std::string executable_name = "vulkaninfo";
+    if (argc >= 1) {
+#ifdef _WIN32
+        const char *platform_separator = "\\";
+#else
+        const char *platform_separator = "/";
+#endif
+        executable_name = std::string(argv[0]);
+        // don't include path separator
+        auto last_occurrence = executable_name.rfind(platform_separator);
+        if (last_occurrence != std::string::npos && last_occurrence < executable_name.length()) {
+            auto sub_length = executable_name.length() - last_occurrence - 1;
+            executable_name = executable_name.substr(last_occurrence + 1, sub_length);
+        }
+    }
+
     // Combinations of output: html only, html AND json, json only, human readable only
     for (int i = 1; i < argc; ++i) {
         // A internal-use-only format for communication with the Vulkan Configurator tool
@@ -969,9 +987,8 @@ int main(int argc, char **argv) {
             std::string start_string =
                 std::string("{\n\t\"$schema\": \"https://schema.khronos.org/vulkan/devsim_1_0_0.json#\",\n") +
                 "\t\"comments\": {\n\t\t\"desc\": \"JSON configuration file describing GPU " + std::to_string(selected_gpu) + " (" +
-                gpus.at(selected_gpu)->props.deviceName +
-                "). Generated using the vulkaninfo program.\",\n\t\t\"vulkanApiVersion\": \"" +
-                VkVersionString(instance.vk_version) + "\"\n" + "\t}";
+                gpus.at(selected_gpu)->props.deviceName + "). Generated using the " + executable_name +
+                " program.\",\n\t\t\"vulkanApiVersion\": \"" + VkVersionString(instance.vk_version) + "\"\n" + "\t}";
 #ifdef VK_USE_PLATFORM_IOS_MVK
             json_out = std::ofstream("vulkaninfo.json");
             printers.push_back(
@@ -993,7 +1010,8 @@ int main(int argc, char **argv) {
                         "\"https://schema.khronos.org/vulkan/devsim_VK_KHR_portability_subset-provisional-1.json#\",\n") +
                     "\t\"comments\": {\n\t\t\"desc\": \"JSON configuration file describing GPU " + std::to_string(selected_gpu) +
                     "'s (" + gpus.at(selected_gpu)->props.deviceName +
-                    "( portability features and properties. Generated using the vulkaninfo program.\",\n\t\t\"vulkanApiVersion\": "
+                    "( portability features and properties. Generated using the " + executable_name +
+                    " program.\",\n\t\t\"vulkanApiVersion\": "
                     "\"" +
                     VkVersionString(instance.vk_version) + "\"\n" + "\t}";
 #ifdef VK_USE_PLATFORM_IOS_MVK
