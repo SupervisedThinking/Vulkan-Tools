@@ -109,7 +109,8 @@ EXTENSION_CATEGORIES = OrderedDict((('phys_device_props2', {'extends': 'VkPhysic
                                    ('phys_device_mem_props2', {'extends': 'VkPhysicalDeviceMemoryProperties2', 'type': 'device'}),
                                    ('phys_device_features2', {'extends': 'VkPhysicalDeviceFeatures2,VkDeviceCreateInfo', 'type': 'device'}),
                                    ('surface_capabilities2', {'extends': 'VkSurfaceCapabilities2KHR', 'type': 'both'}),
-                                   ('format_properties2', {'extends': 'VkFormatProperties2', 'type': 'device'})
+                                   ('format_properties2', {'extends': 'VkFormatProperties2', 'type': 'device'}),
+                                   ('queue_properties2', {'extends': 'VkQueueFamilyProperties2', 'type': 'device'})
                                    ))
 class VulkanInfoGeneratorOptions(GeneratorOptions):
     def __init__(self,
