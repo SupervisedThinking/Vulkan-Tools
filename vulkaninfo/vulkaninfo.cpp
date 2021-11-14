@@ -843,8 +843,13 @@ int vulkanInfoMain(int argc, char **argv) {
 #else
 int main(int argc, char **argv) {
 #endif
-
 #ifdef _WIN32
+
+    _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+    _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
+    _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);
+
     if (ConsoleIsExclusive()) ConsoleEnlarge();
     if (!LoadUser32Dll()) {
         fprintf(stderr, "Failed to load user32.dll library!\n");
