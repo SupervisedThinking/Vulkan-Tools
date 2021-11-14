@@ -858,6 +858,7 @@ int main(int argc, char **argv) {
     }
 #endif
 
+    int return_code = 0;  // set in case of error
     uint32_t selected_gpu = 0;
     bool show_formats = false;
     char *output_path = nullptr;
@@ -947,7 +948,7 @@ int main(int argc, char **argv) {
                 std::cout << "The only available GPU selection is 0.\n";
             else
                 std::cout << "The available GPUs are in the range of 0 to " << gpus.size() - 1 << ".\n";
-            return 0;
+            return 1;
         }
 
         if (human_readable_output) {
@@ -1074,6 +1075,7 @@ int main(int argc, char **argv) {
                 p->FinishOutput();
             }
         }
+        return_code = 1;
     }
     // Call the printer's descrtuctor before the file handle gets closed
     for (auto &p : printers) {
@@ -1085,5 +1087,5 @@ int main(int argc, char **argv) {
     FreeUser32Dll();
 #endif
 
-    return 0;
+    return return_code;
 }
