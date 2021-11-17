@@ -852,20 +852,26 @@ struct ParsedResults {
     bool has_selected_gpu;  // differentiate between selecting the 0th gpu and using the default 0th value
     bool show_tool_props;
     bool show_formats;
-    bool use_custom_filename;
-    char *output_path;
-    char *custom_filename;
+    bool print_to_file;
+    std::string filename;  // set if explicitely given, or if vkconfig_output has a <path> argument
 };
 
 util::trivial_optional<ParsedResults> parse_arguments(int argc, char **argv) {
-    ParsedResults results{};  // default it to zero init everything
+    ParsedResults results{};                         // default it to zero init everything
+    results.output_category = OutputCategory::text;  // default output category
     for (int i = 1; i < argc; ++i) {
         // A internal-use-only format for communication with the Vulkan Configurator tool
         // Usage "--vkconfig_output <path>"
+        // -o can be used to specify the filename instead
         if (0 == strcmp("--vkconfig_output", argv[i]) && argc > (i + 1)) {
             results.output_category = OutputCategory::vkconfig_output;
+            results.print_to_file = true;
             if (argc > (i + 1) && argv[i + 1][0] != '-') {
-                results.output_path = argv[i + 1];
+#ifdef WIN32
+                results.filename = (std::string(argv[i + 1]) + "\\vulkaninfo.json");
+#else
+                results.filename = (std::string(argv[i + 1]) + "/vulkaninfo.json");
+#endif
                 ++i;
             }
         } else if (strncmp("--json", argv[i], 6) == 0 || strcmp(argv[i], "-j") == 0) {
@@ -886,17 +892,19 @@ util::trivial_optional<ParsedResults> parse_arguments(int argc, char **argv) {
         } else if (strcmp(argv[i], "--text") == 0) {
             results.output_category = OutputCategory::text;
         } else if (strcmp(argv[i], "--html") == 0) {
+            results.output_category = OutputCategory::html;
+            results.print_to_file = true;
         } else if (strcmp(argv[i], "--show-tool-props") == 0) {
             results.show_tool_props = true;
         } else if (strcmp(argv[i], "--show-formats") == 0) {
             results.show_formats = true;
         } else if ((strcmp(argv[i], "--output") == 0 || strcmp(argv[i], "-o") == 0) && argc > (i + 1)) {
-            results.use_custom_filename = true;
-            results.custom_filename = argv[i + 1];
             if (argv[i + 1][0] == '-') {
                 std::cout << "-o or --output must be followed by a filename\n";
                 return {};
             }
+            results.print_to_file = true;
+            results.filename = argv[i + 1];
             ++i;
         } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             print_usage(argv[0]);
@@ -908,41 +916,36 @@ util::trivial_optional<ParsedResults> parse_arguments(int argc, char **argv) {
     }
     return results;
 }
-struct PrinterCreateDetails {
-    OutputType output_type = OutputType::text;
-    bool use_file_output = false;
-    std::string file_name = "vulkaninfo.txt";
-    std::string start_string = "";
-};
 
 PrinterCreateDetails get_printer_create_details(ParsedResults &parse_data, AppInstance &inst, AppGpu &selected_gpu) {
     PrinterCreateDetails create{};
-
+    create.print_to_file = parse_data.print_to_file;
     switch (parse_data.output_category) {
         default:
         case (OutputCategory::text):
-            // Default values are for the text output
+            create.output_type = OutputType::text;
+            create.file_name = parse_data.print_to_file ? parse_data.filename : "vulkaninfo.txt";
             break;
         case (OutputCategory::html):
             create.output_type = OutputType::html;
-            create.file_name = "vulkaninfo.html";
-            create.use_file_output = true;
+            create.file_name = parse_data.filename.empty() ? "vulkaninfo.html" : parse_data.filename;
             break;
         case (OutputCategory::devsim_json):
             create.output_type = OutputType::json;
+            create.file_name = parse_data.print_to_file ? parse_data.filename : "vulkaninfo.json";
             create.start_string = std::string("{\n\t\"$schema\": \"https://schema.khronos.org/vulkan/devsim_1_0_0.json#\",\n") +
                                   "\t\"comments\": {\n\t\t\"desc\": \"JSON configuration file describing GPU " +
                                   std::to_string(parse_data.selected_gpu) + " (" + selected_gpu.props.deviceName +
                                   "). Generated using the vulkaninfo program.\",\n\t\t\"vulkanApiVersion\": \"" +
                                   VkVersionString(inst.vk_version) + "\"\n" + "\t}";
 #ifdef VK_USE_PLATFORM_IOS_MVK
-            create.file_name = "vulkaninfo.json";
-            create.use_file_output = true;
+            create.print_to_file = true;
 #endif
             break;
 #if defined(VK_ENABLE_BETA_EXTENSIONS)
         case (OutputCategory::portability_json):
             create.output_type = OutputType::json;
+            create.file_name = parse_data.print_to_file ? parse_data.filename : "portability.json";
             create.start_string =
                 std::string(
                     "{\n\t\"$schema\": "
@@ -954,20 +957,15 @@ PrinterCreateDetails get_printer_create_details(ParsedResults &parse_data, AppIn
                 "\"" +
                 VkVersionString(inst.vk_version) + "\"\n" + "\t}";
 #ifdef VK_USE_PLATFORM_IOS_MVK
-            create.file_name = "portability.json";
-            create.use_file_output = true;
+            create.print_to_file = true;
 #endif
             break;
 #endif  // defined(VK_ENABLE_BETA_EXTENSIONS)
 
         case (OutputCategory::vkconfig_output):
             create.output_type = OutputType::vkconfig_output;
-#ifdef WIN32
-            create.file_name = std::string(parse_data.output_path) + "\\vulkaninfo.json";
-#else
-            create.file_name = std::string(parse_data.output_path) + "/vulkaninfo.json";
-#endif
-            create.use_file_output = true;
+            create.print_to_file = true;
+            create.file_name = parse_data.filename.empty() ? "vulkaninfo.json" : parse_data.filename;
             create.start_string = "{\n\t\"Vulkan Instance Version\": \"" + VkVersionString(inst.vk_version) + "\"";
             break;
     }
@@ -1033,14 +1031,15 @@ int main(int argc, char **argv) {
     user32_handles = &local_user32_handles;
     if (!local_user32_handles.load()) {
         fprintf(stderr, "Failed to load user32.dll library!\n");
-        if (parse_data.output_category == OutputCategory::text) wait_for_console_destroy();
+        if (parse_data.output_category == OutputCategory::text && !parse_data.use_custom_filename) wait_for_console_destroy();
         return 1;
     }
 #endif
 
     std::unique_ptr<Printer> printer;
-    std::ostream out(std::cout.rdbuf());
+    std::ostream std_out(std::cout.rdbuf());
     std::ofstream file_out;
+    std::ostream *out = &std_out;
 
     // if any essential vulkan call fails, it throws an exception
     try {
@@ -1096,16 +1095,11 @@ int main(int argc, char **argv) {
 #endif
 
         auto printer_data = get_printer_create_details(parse_data, instance, *gpus.at(parse_data.selected_gpu));
-        if (printer_data.use_file_output || (parse_data.use_custom_filename && parse_data.custom_filename)) {
-            if (parse_data.use_custom_filename) {
-                file_out = std::ofstream(parse_data.custom_filename);
-            } else {
-                file_out = std::ofstream(printer_data.file_name);
-            }
+        if (printer_data.print_to_file) {
+            file_out = std::ofstream(printer_data.file_name);
+            out = &file_out;
         }
-        bool use_file_out = parse_data.use_custom_filename || printer_data.use_file_output;
-        printer = std::unique_ptr<Printer>(new Printer(printer_data.output_type, use_file_out ? file_out : out,
-                                                       parse_data.selected_gpu, instance.vk_version, printer_data.start_string));
+        printer = std::unique_ptr<Printer>(new Printer(printer_data, *out, parse_data.selected_gpu, instance.vk_version));
 
         RunPrinter(*(printer.get()), parse_data, instance, gpus, surfaces);
 
