@@ -41,6 +41,12 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 option(BUILD_CUBE "Build cube" ON)
 option(BUILD_VULKANINFO "Build vulkaninfo" ON)
 option(BUILD_ICD "Build icd" ON)
+option(BUILD_WSI_XCB_SUPPORT "Build XCB WSI support" ON)
+option(BUILD_WSI_XLIB_SUPPORT "Build Xlib WSI support" ON)
+option(BUILD_WSI_WAYLAND_SUPPORT "Build Wayland WSI support" ON)
+option(BUILD_WSI_DIRECTFB_SUPPORT "Build DirectFB WSI support" OFF)
+set(CUBE_WSI_SELECTION "XCB" CACHE STRING "Select WSI target for vkcube (XCB, XLIB, WAYLAND, DIRECTFB, DISPLAY)")
+
 # Installing the Mock ICD to system directories is probably not desired since this ICD is not a very complete implementation.
 # Require the user to ask that it be installed if they really want it.
 option(INSTALL_ICD "Install icd" OFF)
